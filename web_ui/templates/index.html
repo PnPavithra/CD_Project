@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GLE Parser</title>
+</head>
+<body>
+    <h2>Upload Code File</h2>
+
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="codefile" required>
+        <button type="submit">Run Parser</button>
+    </form>
+
+    {% if result %}
+        <h3>Result:</h3>
+        <pre>{{ result }}</pre>
+    {% endif %}
+</body>
+</html>
