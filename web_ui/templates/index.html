@@ -1,19 +1,170 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GLE Parser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h2>Upload Code File</h2>
 
-    <form method="POST" enctype="multipart/form-data">
-        <input type="file" name="codefile" required>
-        <button type="submit">Run Parser</button>
-    </form>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-black min-h-screen flex items-center justify-center p-6">
 
-    {% if result %}
-        <h3>Result:</h3>
-        <pre>{{ result }}</pre>
+    <div class="backdrop-blur-md bg-white/10 border border-white/20 shadow-2xl rounded-2xl p-10 max-w-2xl w-full text-center">
+
+        
+
+        <h2 class="text-3xl font-semibold text-white tracking-wide mb-6">
+            ⚙️ GLE Parser
+        </h2>
+
+        <form method="POST" enctype="multipart/form-data" class="space-y-6">
+
+            <!-- Upload Box -->
+            <label id="fileLabel" 
+                class="flex flex-col items-center px-4 py-6 bg-white/10 text-white rounded-lg border-2 border-dashed border-gray-500 cursor-pointer hover:bg-white/20 transition">
+                <span class="text-lg" id="fileText">📁 Click to Upload Code File</span>
+                <input type="file" name="codefile" class="hidden" required onchange="previewFile(event)" />
+            </label>
+
+            <!-- Preview Content -->
+            <div id="previewContainer" class="hidden">
+                <h3 class="text-xl text-green-400 font-semibold mt-4">📄 Preview:</h3>
+                <pre id="fileContent" 
+                     class="bg-black/50 text-gray-300 border border-gray-600 rounded-lg p-5 text-left mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap"></pre>
+            </div>
+
+            <button type="submit"
+                class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-lg shadow-lg hover:shadow-blue-500/50 hover:scale-[1.02] transition-all">
+                🔍 Run Parser
+            </button>
+        </form>
+
+        {% if result %}
+            <h3 class="text-xl font-semibold text-white mt-8">Result:</h3>
+            <pre class="bg-black/50 text-green-400 border border-gray-600 rounded-lg p-5 text-left mt-3 max-h-60 overflow-y-auto whitespace-pre-wrap">
+{{ result }}
+            </pre>
+        {% endif %}
+
+        <h3 class="text-xl font-semibold text-white mt-10">📌 Scope & Expression Visualization</h3>
+<div id="treeContainer" class="w-full h-96 bg-black/40 border border-gray-600 rounded-lg mt-4 overflow-hidden"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+
+    </div>
+
+    
+
+
+<script>
+    function previewFile(event) {
+        const file = event.target.files[0];
+        if(file) {
+            document.getElementById("fileText").textContent = "📄 " + file.name;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+
+                // Show preview
+                document.getElementById("fileContent").textContent = content;
+                document.getElementById("previewContainer").classList.remove("hidden");
+
+                // Store in localStorage
+                localStorage.setItem("uploadedFilename", file.name);
+                localStorage.setItem("uploadedContent", content);
+            };
+            reader.readAsText(file);
+        }
+    }
+
+    // Restore preview after reload
+    window.onload = () => {
+        const savedContent = localStorage.getItem("uploadedContent");
+        const savedName = localStorage.getItem("uploadedFilename");
+
+        if(savedContent && savedName) {
+            document.getElementById("fileText").textContent = "📄 " + savedName;
+            document.getElementById("fileContent").textContent = savedContent;
+            document.getElementById("previewContainer").classList.remove("hidden");
+        }
+    };
+</script>
+<script>
+function drawTree(treeData) {
+    document.getElementById("treeContainer").innerHTML = "";
+
+    const width = document.getElementById("treeContainer").offsetWidth;
+    const height = 380;
+
+    const svg = d3.select("#treeContainer")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    const g = svg.append("g").attr("transform", "translate(50,50)");
+
+    const treeLayout = d3.tree().size([width - 100, height - 100]);
+
+    const root = d3.hierarchy(treeData);
+
+    treeLayout(root);
+
+    // draw links
+    g.selectAll('.link')
+        .data(root.links())
+        .enter()
+        .append('line')
+        .attr('class', 'link')
+        .attr('x1', d => d.source.x)
+        .attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x)
+        .attr('y2', d => d.target.y)
+        .attr('stroke', '#aaa');
+
+    // draw nodes
+    const nodes = g.selectAll('.node')
+        .data(root.descendants())
+        .enter()
+        .append('g')
+        .attr('class', 'node')
+        .attr('transform', d => `translate(${d.x},${d.y})`);
+
+    nodes.append('circle')
+        .attr('r', 18)
+        .attr('fill', d => {
+            if (d.data.type === "GlobalVariable") return '#3b82f6';     // blue
+            if (d.data.type === "Function") return '#9333ea';           // purple
+            if (d.data.type === "Parameter") return '#22c55e';         // green
+            if (d.data.type === "Expression") return '#ef4444';        // red
+            return '#fff';
+        })
+        .attr("stroke", "#fff");
+
+    nodes.append('text')
+        .attr('dy', '.35em')
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#fff')
+        .style("font-size", "11px")
+        .text(d => d.data.name || d.data.type);
+}
+
+
+// Restore and Draw After Reload If Available
+window.onload = () => {
+    const savedAST = localStorage.getItem("gle_AST");
+    if(savedAST){
+        drawTree(JSON.parse(savedAST));
+    }
+};
+</script>
+<script>
+    {% if ast %}
+        localStorage.setItem("gle_AST", JSON.stringify({{ ast|safe }}));
+        drawTree({{ ast|safe }});
     {% endif %}
+</script>
+
+
 </body>
 </html>
